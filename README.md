@@ -104,9 +104,18 @@ nano ltmc_configuration.json
 
 ```
 
-**Supported models:** LABEL_WISE_ATTENTION_NETWORK, ZERO_LABEL_WISE_ATTENTION_NETWORK, GRAPH_LABEL_WISE_ATTENTION_NETWORK, BERT
-**Supported token encodings:** word2vec, elmo 
+**Supported models:** 
+* LABEL_WISE_ATTENTION_NETWORK (referred as LWAN in paper)
+* ZERO_LABEL_WISE_ATTENTION_NETWORK (referred as CLWAN in paper)
+* GRAPH_LABEL_WISE_ATTENTION_NETWORK (referred as GCLWAN in paper)
+* BERT
+
+For all Label-wise Attention Networks, you have to define document encoder.
+For zero-shot and graph-aware Label-wise Attention Networks, you also have to define label encoder.
+
 **Supported document encoders:** grus, cnns
+
+**Supported label encoders:** word2vec, word2vec+, node2vec, node2vec+, word2vec+node2vec
 
 ### Train a model:
 
