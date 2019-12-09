@@ -1,0 +1,67 @@
+{
+  "task": {
+    "operation_mode": "hyperopt",
+    "task_name": "mimic_classification",
+    "dataset_type": "json",
+    "dataset": "mimic",
+    "decision_type": "multi_label",
+    "cuDNN": true,
+    "task_language": "en"
+  },
+ "model": {
+    "architecture": "ZERO-LABEL-WISE-TRANSFORMERS",
+    "hierarchical": false,
+    "document_encoder": "transformers",
+    "label_encoder": "average",
+    "attention_mechanism": "attention",
+    "return_attention":  false,
+    "token_encoding": "word2vec",
+    "embeddings": "en/pubmed2018_w2v_200D.bin",
+    "bert": null,
+    "revisions": null
+  },
+  "training": {
+    "n_hidden_layers": 3,
+    "hidden_units_size": 400,
+    "dropout_rate": 0.1,
+    "word_dropout_rate": 0.00,
+    "lr": 0.001,
+    "batch_size": 2,
+    "epochs": 50,
+    "patience": 5,
+    "accumulation_steps": 4
+  },
+  "hyper_optimization": {
+	"log_name": "",
+    "grid_search": true,
+    "score_to_track": "R-Precision",
+    "trials": 4,
+    "folds": 1,
+    "n_hidden_layers": [3,4],
+    "hidden_units_size": [200],
+    "dropout_rate": [0.1,0.2],
+    "word_dropout_rate": [0.0],
+    "learning_rate": [0.001],
+    "batch_size": [2],
+    "epochs": 70,
+    "patience": 10
+ },
+  "sampling": {
+    "few_threshold": 5,
+    "max_sequences_size": 0,
+    "max_sequence_size": 2000,
+    "max_label_size": 32,
+    "sampling_ratio": null,
+    "split_type": null,
+    "validation_size": 0.2,
+    "preprocessed": true,
+    "load_from_disk": true,
+    "dynamic_batching": false
+  },
+  "evaluation": {
+    "evaluation@k": 20,
+    "advanced_mode": true,
+    "save_predictions": false,
+    "model_path": null
+  }
+}
