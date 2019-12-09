@@ -24,11 +24,13 @@ python
 >>> nltk.download('punkt')
 ```
 
-### Get pre-trained word embeddings (GloVe + Law2Vec):
+### Get pre-trained word embeddings (GloVe + PubMED):
 
 ```
 wget -P data/vectors/ http://nlp.stanford.edu/data/glove.6B.zip
 unzip -j data/vectors/glove.6B.zip data/vectors/glove.6B.200d.txt
+wget -P data/vectors/ https://archive.org/details/pubmed2018_w2v_200D.tar
+tar xvzf pubmed2018_w2v_200D.tar
 ```
 
 ### Download datasets 
@@ -40,8 +42,8 @@ unzip -j data/vectors/glove.6B.zip data/vectors/glove.6B.200d.txt
 ### Download in-domain BERT versions
 
 * LegalBERT [download](legalbert.tar.gz)
-* clinicalBERT [download](legalbert.tar.gz)
-* AmazonBERT [download](legalbert.tar.gz)
+* ClinicalBERT [download](https://www.dropbox.com/s/8armk04fu16algz/pretrained_bert_tf.tar.gz?dl=1)
+* AmazonBERT [download](amazonbert.tar.gz)
 
 ### Select training options from the configuration JSON file:
 
