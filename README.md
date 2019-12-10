@@ -30,7 +30,7 @@ python
 wget -P data/vectors/ http://nlp.stanford.edu/data/glove.6B.zip
 unzip -j data/vectors/glove.6B.zip data/vectors/glove.6B.200d.txt
 wget -P data/vectors/ https://archive.org/details/pubmed2018_w2v_200D.tar
-tar xvzf pubmed2018_w2v_200D.tar
+tar xvzf data/vectors/pubmed2018_w2v_200D.tar
 ```
 
 ### Download datasets 
