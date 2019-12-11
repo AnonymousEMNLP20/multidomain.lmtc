@@ -41,9 +41,9 @@ tar xvzf data/vectors/pubmed2018_w2v_200D.tar
 
 ### Download in-domain BERT versions
 
-* LegalBERT [download](legalbert.tar.gz)
+* LegalBERT [download](https://drive.google.com/open?id=1z6Q8dmCBvIMsV3uOn8ODloDGeaAQhRf-)
 * ClinicalBERT [download](https://www.dropbox.com/s/8armk04fu16algz/pretrained_bert_tf.tar.gz?dl=1)
-* AmazonBERT [download](amazonbert.tar.gz)
+* AmazonBERT [download](https://drive.google.com/open?id=1jGBwGF8BvenYtjEf44YMrFN0yzxOTvMh)
 
 ### Select training options from the configuration JSON file:
 
