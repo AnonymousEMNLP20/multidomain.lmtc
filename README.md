@@ -1,12 +1,10 @@
-## A Study on Large-Scale Multi-Label Text Classification: from Label Treesto Neural Transfer Learning, including Few- and Zero-Shot Labels
+## An Empirical Study on Large-Scale Multi-Label Text Classification including Few and Zero-Shot Labels
 
 ## Requirements:
 
 * \>= Python 3.6
-* == TensorFlow 1.15
-* == TensorFlow-Hub 0.7.0
+* == TensorFlow 2.2.0
 * \>= Gensim 3.5.0
-* == Keras 2.2.4
 * \>= NLTK 3.4
 * \>= Scikit-Learn 0.20.1
 * \>= Spacy 2.1.0
@@ -38,12 +36,6 @@ tar xvzf data/vectors/pubmed2018_w2v_200D.tar
 * EURLEX57K [download](http://nlp.cs.aueb.gr/software_and_datasets/EURLEX57K/datasets.zip)
 * AMAZON13K [download](https://drive.google.com/open?id=0B3lPMIHmG6vGYm9abnAzTU1XaTQ)
 * MIMIC-III [download](https://mimic.physionet.org)
-
-### Download in-domain BERT versions
-
-* LegalBERT [download](https://drive.google.com/open?id=1z6Q8dmCBvIMsV3uOn8ODloDGeaAQhRf-)
-* ClinicalBERT [download](https://www.dropbox.com/s/8armk04fu16algz/pretrained_bert_tf.tar.gz?dl=1)
-* AmazonBERT [download](https://drive.google.com/open?id=1jGBwGF8BvenYtjEf44YMrFN0yzxOTvMh)
 
 ### Select training options from the configuration JSON file:
 
