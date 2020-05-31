@@ -1,0 +1,65 @@
+{
+  "task": {
+    "operation_mode": "train",
+    "task_name": "mimic_classification",
+    "dataset_type": "json",
+    "dataset": "mimic",
+    "decision_type": "multi_label",
+    "cuDNN": true,
+    "task_language": "en"
+  },
+  "model": {
+    "architecture": "BERT",
+    "hierarchical": false,
+    "document_encoder": false,
+    "label_encoder": null,
+    "attention_mechanism": "maxpooling",
+    "return_attention":  false,
+    "token_encoding": "word2vec",
+    "embeddings": "en/glove.6B.200d.bin",
+    "bert": "scibert"
+  },
+  "training": {
+    "n_hidden_layers": 1,
+    "hidden_units_size": 100,
+    "dropout_rate": 0.1,
+    "word_dropout_rate": 0.00,
+    "lr": 0.00002,
+    "batch_size": 4,
+    "epochs": 20,
+    "patience": 2
+  },
+  "hyper_optimization": {
+	"log_name": "",
+    "grid_search": true,
+    "score_to_track": "R-Precision",
+    "trials": 30,
+    "folds": 1,
+    "n_hidden_layers": [1, 2],
+    "hidden_units_size": [200, 300, 400],
+    "dropout_rate": [0.1, 0.2, 0.3, 0.4, 0.5],
+    "word_dropout_rate": [0.0, 0.01, 0.02],
+    "learning_rate": [0.001],
+    "batch_size": [8, 12, 16],
+    "epochs": 50,
+    "patience": 10
+ },
+  "sampling": {
+    "few_threshold": 5,
+    "max_sequences_size": 4,
+    "max_sequence_size": 512,
+    "max_label_size": 32,
+    "sampling_ratio": null,
+    "split_type": null,
+    "validation_size": 0.2,
+    "preprocessed": false,
+    "load_from_disk": true,
+    "dynamic_batching": true
+  },
+  "evaluation": {
+    "evaluation@k": 20,
+    "advanced_mode": true,
+    "save_predictions": false,
+    "model_path": null
+  }
+}

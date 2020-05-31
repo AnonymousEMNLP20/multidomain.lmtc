@@ -3,9 +3,9 @@ import os
 import numpy as np
 import pickle
 from lmtc.data import VECTORS_DIR, MODELS_DIR
+from lmtc.document_model.model import Token, Tag
 from lmtc.experiments.configurations.configuration import Configuration
-from lmtc.neural_networks.layers.custom_bert.vocab import BERTTextEncoder
-from lmtc.neural_networks.layers.custom_albert.vocab import ALBERTTextEncoder
+from transformers import RobertaTokenizer, BertTokenizer, AutoTokenizer
 
 
 class Vectorizer(object):
@@ -13,56 +13,43 @@ class Vectorizer(object):
     def __init__(self):
         pass
 
-    def vectorize_inputs(self, sequences: List[List[str]], max_sequence_size=100, **kwargs):
+    def vectorize_inputs(self, sequences: List[List[Token]], max_sequence_size=100, **kwargs):
+        raise NotImplementedError
+
+    def vectorize_targets(self, sequences: List[List[Token]], tags: List[List[List[Tag]]]):
         raise NotImplementedError
 
 
 class BERTVectorizer(Vectorizer):
 
     def __init__(self):
+        if Configuration['model']['bert'] == 'biobert':
+            self.bert_tokenizer = BertTokenizer.from_pretrained(vocab_file=os.path.join(MODELS_DIR, 'biobert', 'assets', 'vocab.txt'))
+        elif Configuration['model']['bert'] == 'roberta':
+            self.bert_tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+        elif Configuration['model']['bert'] == 'scibert':
+            self.bert_tokenizer = AutoTokenizer.from_pretrained('allenai/scibert_scivocab_uncased')
+        else:
+            self.bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         super().__init__()
 
-    def vectorize_inputs(self, sequences: List[List[str]], max_sequence_size=100, **kwargs):
+    def vectorize_inputs(self, sequences: List[List[Token]], max_sequence_size=100, **kwargs):
 
-        if Configuration['model']['bert'] == 'biobert':
-            bert_tokenizer = BERTTextEncoder(vocab_file=os.path.join(MODELS_DIR, 'bert', 'biobert', 'assets', 'vocab.txt'),
-                                             do_lower_case=False, max_len=max_sequence_size)
-        elif Configuration['model']['bert'] == 'clinicalbert':
-            bert_tokenizer = BERTTextEncoder(vocab_file=os.path.join(MODELS_DIR, 'bert', 'clinicalbert', 'assets', 'vocab.txt'),
-                                             do_lower_case=False, max_len=max_sequence_size)
-        elif Configuration['model']['bert'] == 'scibert':
-            bert_tokenizer = BERTTextEncoder(vocab_file=os.path.join(MODELS_DIR, 'bert', 'scibert', 'assets', 'vocab.txt'),
-                                             do_lower_case=True, max_len=max_sequence_size)
-        elif Configuration['model']['bert'] == 'legalbert':
-            bert_tokenizer = BERTTextEncoder(vocab_file=os.path.join(MODELS_DIR, 'bert', 'legalbert', 'assets', 'vocab.txt'),
-                                             do_lower_case=True, max_len=max_sequence_size)
-        elif Configuration['model']['bert'] == 'albert-base':
-            vocab_model = 'vocab_base.model' if Configuration['model']['bert'] == 'albert-base' else 'vocab_large.model'
-            bert_tokenizer = ALBERTTextEncoder(spm_model_file=os.path.join(VECTORS_DIR, 'bert', vocab_model),
-                                               do_lower_case=True, max_len=max_sequence_size)
-        elif Configuration['model']['bert'] == 'bert-base':
-            bert_tokenizer = BERTTextEncoder(vocab_file=os.path.join(VECTORS_DIR, 'bert-base', 'vocab.txt'),
-                                             do_lower_case=True, max_len=max_sequence_size)
-        else:
-            raise Exception('BERT version {} is not supported'.format(Configuration['model']['bert']))
-
-        token_indices = np.zeros((len(sequences), max_sequence_size), dtype=np.int32)
-        seg_indices = np.zeros((len(sequences), max_sequence_size), dtype=np.int32)
-        mask_indices = np.zeros((len(sequences), max_sequence_size), dtype=np.int32)
-        start_indices = np.zeros((len(sequences), max_sequence_size), dtype=np.int32)
-
+        inputs = np.zeros((2, len(sequences), max_sequence_size, ), dtype=np.int32)
+        # Encode BERT embeddings
         for i, tokens in enumerate(sequences):
-            text = ' '.join([token for token in tokens[:max_sequence_size]])
-            if Configuration['model']['bert'] in ['legalbert_500K', 'legalbert_1M']:
-                text = text.replace('\n', 'newline')
-            tokens, starts = bert_tokenizer.encode(text)
-            token_indices[i, :len(tokens)] = tokens
-            mask_indices[i, :len(tokens)] = np.ones((len(tokens)), dtype=np.int32)
-            start_indices[i, :len(tokens)] = starts
+            tokens = self.bert_tokenizer.encode(' '.join([token.token_text for token in tokens[:max_sequence_size]]))
+            if max_sequence_size <= len(tokens):
+                inputs[0, i, :max_sequence_size] = tokens[:max_sequence_size-1] + [tokens[-1]]
+                inputs[1, i, :max_sequence_size] = np.ones((max_sequence_size,), dtype=np.int32)
+            else:
+                inputs[0, i, :len(tokens)] = tokens
+                inputs[1, i, :len(tokens)] = np.ones((len(tokens),), dtype=np.int32)
 
-        return np.concatenate((np.reshape(token_indices, [len(sequences), max_sequence_size, 1]),
-                               np.reshape(mask_indices, [len(sequences), max_sequence_size, 1]),
-                               np.reshape(seg_indices, [len(sequences), max_sequence_size, 1])), axis=-1), start_indices
+        return inputs
+
+    def vectorize_targets(self, sequences: List[List[Token]], tags: List[List[List[Tag]]]):
+        pass
 
 
 class ELMoVectorizer(Vectorizer):
@@ -70,16 +57,19 @@ class ELMoVectorizer(Vectorizer):
     def __init__(self):
         super().__init__()
 
-    def vectorize_inputs(self, sequences: List[List[str]], max_sequence_size=100, **kwargs):
+    def vectorize_inputs(self, sequences: List[List[Token]], max_sequence_size=100, **kwargs):
 
         word_inputs = []
         # Encode ELMo embeddings
         for i, tokens in enumerate(sequences):
-            sequence = ' '.join([token for token in tokens[:max_sequence_size]])
+            sequence = ' '.join([token.token_text for token in tokens[:max_sequence_size]])
             if len(tokens) < max_sequence_size:
                 sequence = sequence + ' ' + ' '.join(['#' for i in range(max_sequence_size - len(tokens))])
             word_inputs.append([sequence])
         return np.asarray(word_inputs)
+
+    def vectorize_targets(self, sequences: List[List[Token]], tags: List[List[List[Tag]]]):
+        pass
 
 
 class W2VVectorizer(Vectorizer):
@@ -89,7 +79,7 @@ class W2VVectorizer(Vectorizer):
         w2v_index = w2v_model.split('/')[-1].replace('.bin', '.index')
         self.indices = {'word': pickle.load(open(os.path.join(VECTORS_DIR, 'indices', w2v_index), 'rb'))}
 
-    def vectorize_inputs(self, sequences: List[List[str]], max_sequence_size=100, features=['word', 'shape', 'pos']):
+    def vectorize_inputs(self, sequences: List[List[Token]], max_sequence_size=100, features=['word', 'shape', 'pos']):
         """
         Produce W2V indices for each token in the list of tokens
         :param sequences: list of lists of tokens
@@ -98,11 +88,48 @@ class W2VVectorizer(Vectorizer):
         """
 
         word_inputs = np.zeros((len(sequences), max_sequence_size, ), dtype=np.int32)
+        if 'shape' in features:
+            shape_inputs = np.zeros((len(sequences), max_sequence_size,), dtype=np.int32)
+        if 'pos' in features:
+            pos_inputs = np.zeros((len(sequences), max_sequence_size,), dtype=np.int32)
+
         for i, sentence in enumerate(sequences):
             for j, token in enumerate(sentence[:max_sequence_size]):
-                if token.lower() in self.indices['word']:
+                if token.norm in self.indices['word']:
                     word_inputs[i][j] = self.indices['word'][token.norm]
                 else:
                     word_inputs[i][j] = self.indices['word']['UNKNOWN']
+                if 'shape' in features:
+                    if token.features['shape'] in self.indices['shape']:
+                        shape_inputs[i][j] = self.indices['shape'][token.features['shape']]
+                    else:
+                        shape_inputs[i][j] = self.indices['shape']['UNKNOWN']
+                if 'pos' in features:
+                    if token.features['pos'] in self.indices['pos']:
+                        pos_inputs[i][j] = self.indices['pos'][token.features['pos']]
+                    else:
+                        pos_inputs[i][j] = self.indices['pos']['UNKNOWN']
+        if features == ['word', 'shape', 'pos']:
+            return word_inputs, shape_inputs, pos_inputs
+        else:
+            return word_inputs
 
-        return word_inputs
+    def vectorize_targets(self, sequences: List[List[Token]], tags: List[List[List[Tag]]], max_sequence_size=100):
+        """
+        Produce (pos, shape, label) for each token in the list of tokens
+        :param sequences: list of lists of tokens
+        :param tags: list of lists of tags
+        :param max_sequence_size: maximum padding
+        """
+
+        labels = np.zeros((len(tags), max_sequence_size, len(Configuration['classes'])), dtype=np.int8)
+
+        for i, sentence_tags in enumerate(tags):
+            for j, token_tags in enumerate(sentence_tags[:max_sequence_size]):
+                for tag in token_tags:
+                    if tag.name in Configuration['task']['classes']:
+                        labels[i][j][Configuration['task']['classes'][tag.name]] = 1
+                if not sum(labels[i][j]):
+                    labels[i][j][0] = 1
+
+        return labels

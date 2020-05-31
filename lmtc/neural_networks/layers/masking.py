@@ -6,8 +6,8 @@ from __future__ import division
 from __future__ import print_function
 
 
-from keras import backend as K
-from keras.engine.base_layer import Layer
+from tensorflow.keras import backend as K
+from tensorflow.keras.layers import Layer
 
 
 class SymmetricMasking(Layer):
@@ -65,27 +65,6 @@ class SymmetricMasking(Layer):
 
     def compute_output_shape(self, input_shape):
         return input_shape
-
-
-class Masking(Layer):
-
-    def __init__(self, mask_value=0., **kwargs):
-        super(Masking, self).__init__(**kwargs)
-        self.mask_value = mask_value
-
-    def call(self, inputs):
-        if len(inputs.shape) == 3:
-            output_mask = K.any(K.not_equal(inputs, self.mask_value), axis=-1)
-        else:
-            output_mask = K.not_equal(inputs, self.mask_value)
-        return output_mask
-
-        return output_mask
-
-    def get_config(self):
-        config = {'mask_value': self.mask_value}
-        base_config = super(SymmetricMasking, self).get_config()
-        return dict(list(base_config.items()) + list(config.items()))
 
 
 class Camouflage(Layer):

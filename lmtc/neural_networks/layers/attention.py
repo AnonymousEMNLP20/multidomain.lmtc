@@ -1,6 +1,8 @@
-from keras import backend as K
-from keras import initializers, regularizers
-from keras.layers import Layer, Add
+from tensorflow.keras import backend as K
+from tensorflow.keras import initializers, regularizers, constraints
+from tensorflow.keras.layers import Layer
+import tensorflow as tf
+import numpy as np
 
 
 def dot_product(x, kernel):
@@ -16,6 +18,210 @@ def dot_product(x, kernel):
         return K.squeeze(K.dot(x, K.expand_dims(kernel)), axis=-1)
     else:
         return K.dot(x, kernel)
+
+
+class Attention(Layer):
+    def __init__(self,
+                 kernel_regularizer=None, bias_regularizer=None,
+                 W_constraint=None, b_constraint=None,
+                 bias=True,
+                 return_attention=False,
+                 **kwargs):
+        """
+        Keras Layer that implements an Attention mechanism for temporal data.
+        Supports Masking.
+        Follows the work of Raffel et al. [https://arxiv.org/abs/1512.08756]
+        # Input shape
+            3D tensor with shape: `(samples, steps, features)`.
+        # Output shape
+            2D tensor with shape: `(samples, features)`.
+        :param kwargs:
+
+        Just put it on top of an RNN Layer (GRU/LSTM/SimpleRNN) with return_sequences=True.
+        The dimensions are inferred based on the output shape of the RNN.
+
+
+        Note: The layer has been tested with Keras 1.x
+
+        Example:
+            model.add(LSTM(64, return_sequences=True))
+            model.add(Attention())
+            # next add a Dense layer (for classification/regression) or whatever...
+
+        """
+        self.supports_masking = True
+        self.init = initializers.get('glorot_uniform')
+
+        self.W_regularizer = regularizers.get(kernel_regularizer)
+        self.b_regularizer = regularizers.get(bias_regularizer)
+
+        self.W_constraint = constraints.get(W_constraint)
+        self.b_constraint = constraints.get(b_constraint)
+
+        self.bias = bias
+        self.return_attention = return_attention
+        super(Attention, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        assert len(input_shape) == 3
+
+        self.W = self.add_weight((input_shape[-1],),
+                                 initializer=self.init,
+                                 name='attention_W'.format(self.name))
+
+        if self.bias:
+            self.b = self.add_weight((1,),
+                                     initializer='zeros',
+                                     name='attention_b'.format(self.name),
+                                     regularizer=self.b_regularizer,
+                                     constraint=self.b_constraint)
+        else:
+            self.b = None
+
+        self.built = True
+
+    def compute_mask(self, inputs, mask=None):
+        # do not pass the mask to the next layers
+        if self.return_attention:
+            return [None, None]
+        return None
+
+    def call(self, x, mask=None):
+        eij = dot_product(x, self.W)
+
+        if self.bias:
+            eij += self.b
+
+        # apply mask after the exp. will be re-normalized next
+        if mask is not None:
+            # Cast the mask to floatX to avoid float64 upcasting in theano
+            eij *= K.cast(mask, K.floatx())
+
+        # compute softmax
+        a = K.expand_dims(K.softmax(eij, axis=-1))
+        weighted_input = x * a
+        result = K.sum(weighted_input, axis=1)
+
+        if self.return_attention:
+            return [result, a]
+        return result
+
+    def compute_output_shape(self, input_shape):
+        if self.return_attention:
+            return [(input_shape[0], input_shape[-1]),
+                    (input_shape[0], input_shape[1])]
+        else:
+            return input_shape[0], input_shape[-1]
+
+
+class ContextualAttention(Layer):
+    def __init__(self,
+                 kernel_regularizer=None, u_regularizer=None, bias_regularizer=None,
+                 W_constraint=None, u_constraint=None, b_constraint=None,
+                 bias=True,
+                 return_attention=False,
+                 **kwargs):
+        """
+        Keras Layer that implements a context-aware Attention mechanism for temporal data.
+        Supports Masking.
+        Follows the work of Yang et al. [https://www.cs.cmu.edu/~diyiy/docs/naacl16.pdf]
+        "Hierarchical Attention Networks for Document Classification"
+        by using a context vector to assist the attention
+        # Input shape
+            3D tensor with shape: `(samples, steps, features)`.
+        # Output shape
+            2D tensor with shape: `(samples, features)`.
+        :param kwargs:
+
+        Just put it on top of an RNN Layer (GRU/LSTM/SimpleRNN) with return_sequences=True.
+        The dimensions are inferred based on the output shape of the RNN.
+
+
+        Note: The layer has been tested with Keras 1.x
+
+        Example:
+            model.add(LSTM(64, return_sequences=True))
+            model.add(Attention())
+            # next add a Dense layer (for classification/regression) or whatever...
+
+        """
+        self.supports_masking = True
+        self.init = initializers.get('glorot_uniform')
+
+        self.W_regularizer = regularizers.get(kernel_regularizer)
+        self.u_regularizer = regularizers.get(u_regularizer)
+        self.b_regularizer = regularizers.get(bias_regularizer)
+
+        self.W_constraint = constraints.get(W_constraint)
+        self.u_constraint = constraints.get(u_constraint)
+        self.b_constraint = constraints.get(b_constraint)
+
+        self.bias = bias
+        self.return_attention = return_attention
+        super(ContextualAttention, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        assert len(input_shape) == 3
+
+        self.W = self.add_weight((input_shape[-1], input_shape[-1],),
+                                 initializer=self.init,
+                                 name='{}_W'.format(self.name),
+                                 regularizer=self.W_regularizer,
+                                 constraint=self.W_constraint)
+        if self.bias:
+            self.b = self.add_weight((input_shape[-1],),
+                                     initializer='zeros',
+                                     name='{}_b'.format(self.name),
+                                     regularizer=self.b_regularizer,
+                                     constraint=self.b_constraint)
+        else:
+            self.b = None
+
+        self.u = self.add_weight((input_shape[-1],),
+                                 initializer=self.init,
+                                 name='{}_u'.format(self.name),
+                                 regularizer=self.u_regularizer,
+                                 constraint=self.u_constraint)
+
+        super(ContextualAttention, self).build(input_shape)
+
+    def compute_mask(self, inputs, mask=None):
+        # do not pass the mask to the next layers
+        if self.return_attention:
+            return [None, None]
+        return None
+
+    def call(self, x, mask=None):
+        uit = dot_product(x, self.W)
+
+        if self.bias:
+            uit += self.b
+
+        uit = K.tanh(uit)
+
+        # Dot product with context vector U
+        ait = dot_product(uit, self.u)
+
+        # apply mask after the exp. will be re-normalized next
+        if mask is not None:
+            # Cast the mask to floatX to avoid float64 upcasting in theano
+            ait *= K.cast(mask, K.floatx())
+
+        # compute softmax
+        a = K.expand_dims(K.softmax(ait, axis=-1))
+        weighted_input = x * a
+        result = K.sum(weighted_input, axis=1)
+
+        if self.return_attention:
+            return [result, a]
+        return result
+
+    def compute_output_shape(self, input_shape):
+        if self.return_attention:
+            return [(input_shape[0], input_shape[-1]),
+                    (input_shape[0], input_shape[1])]
+        else:
+            return input_shape[0], input_shape[-1]
 
 
 class LabelDrivenAttention(Layer):
@@ -34,7 +240,6 @@ class LabelDrivenAttention(Layer):
     def build(self, input_shape):
         assert len(input_shape[0]) == 3
         assert len(input_shape[1]) == 2
-        print(input_shape[0][-1], input_shape[1][-1])
         assert input_shape[0][-1] == input_shape[1][-1]
 
         self.W_d = self.add_weight((input_shape[1][-1], input_shape[0][-1]),
@@ -48,7 +253,6 @@ class LabelDrivenAttention(Layer):
                                    name='{}_bd'.format(self.name))
 
         if self.graph_op is not None:
-            print('OOOO GRAPH')
             self.W_p = []
             self.W_c = []
             self.W_s = []
@@ -166,7 +370,7 @@ class LabelDrivenAttention(Layer):
 class LabelWiseAttention(Layer):
 
     def __init__(self, kernel_regularizer=None, bias_regularizer=None,
-                 return_attention=False, n_classes=14268, label_revisions=None, encoder=None, **kwargs):
+                 return_attention=False, n_classes=14268, **kwargs):
 
         self.W_regularizer = regularizers.get(kernel_regularizer)
         self.b_regularizer = regularizers.get(bias_regularizer)
@@ -174,15 +378,9 @@ class LabelWiseAttention(Layer):
         self.supports_masking = True
         self.return_attention = return_attention
         self.n_classes = n_classes
-        self.label_revisions = label_revisions
-        self.encoder = encoder
         super(LabelWiseAttention, self).__init__(**kwargs)
 
     def build(self, input_shape):
-
-        if len(input_shape) == 2:
-            input_shape = input_shape[0]
-
         assert len(input_shape) == 3
 
         self.Wa = self.add_weight((self.n_classes, input_shape[-1]),
@@ -200,9 +398,6 @@ class LabelWiseAttention(Layer):
                                   regularizer=self.b_regularizer,
                                   name='{}_bo'.format(self.name))
 
-        if self.encoder == 'bert':
-            self.add = Add()
-
         super(LabelWiseAttention, self).build(input_shape)
 
     def compute_mask(self, inputs, mask=None):
@@ -212,9 +407,6 @@ class LabelWiseAttention(Layer):
         return None
 
     def call(self, x, mask=None):
-
-        if self.encoder == 'bert':
-            x, cls_doc_rep = x
 
         a = dot_product(x, self.Wa)
 
@@ -228,17 +420,6 @@ class LabelWiseAttention(Layer):
                 return [label_aware_doc_rep, label_aware_doc_rep]
 
         label_aware_doc_reprs, attention_scores = K.tf.map_fn(label_wise_attention, [x, a])
-
-        if self.encoder == 'bert':
-            cls_doc_rep = K.repeat_elements(K.expand_dims(cls_doc_rep, axis=1), rep=4271, axis=1)
-            print(label_aware_doc_reprs.shape)
-            label_aware_doc_reprs = self.add([label_aware_doc_reprs, cls_doc_rep]) / 2
-            print(label_aware_doc_reprs.shape)
-
-        if self.label_revisions is not None:
-            for revisionist in self.revisionists:
-                label_aware_doc_reprs = self.concat([label_aware_doc_reprs, self.Wa])
-                label_aware_doc_reprs = revisionist(label_aware_doc_reprs)
 
         # Compute label-scores
         label_aware_doc_reprs = K.sum(label_aware_doc_reprs * self.Wo, axis=-1) + self.bo
@@ -254,3 +435,72 @@ class LabelWiseAttention(Layer):
             return [(input_shape[0], self.n_classes),
                     (input_shape[0], input_shape[1], self.n_classes, input_shape[-1])]
         return input_shape[0], self.n_classes
+
+
+class MultiHeadSelfAttention(Layer):
+
+    def __init__(self, n_heads: int, units: int, **kwargs):
+        super().__init__(**kwargs)
+        self.n_heads = n_heads
+        self.units = units
+        self.supports_masking = True
+
+    def compute_output_shape(self, input_shape):
+        x = input_shape
+        return x[0], x[1], x[2] // 3
+
+    def compute_mask(self, inputs, mask=None):
+        # do not pass the mask to the next layers
+        return None
+
+    def call(self, inputs,  mask=None):
+        def shape_list(x):
+            tmp = K.int_shape(x)
+            tmp = list(tmp)
+            tmp[0] = -1
+            tmp[1] = tf.shape(x)[1]
+            return tmp
+
+        def split_heads(x, n_heads: int, k: bool = False):
+            x_shape = shape_list(x)
+            m = x_shape[-1]
+            new_x_shape = x_shape[:-1] + [n_heads, m // n_heads]
+            new_x = K.reshape(x, new_x_shape)
+            return K.permute_dimensions(new_x, [0, 2, 3, 1] if k else [0, 2, 1, 3])
+
+        def merge_heads(x):
+            new_x = K.permute_dimensions(x, [0, 2, 1, 3])
+            x_shape = shape_list(new_x)
+            new_x_shape = x_shape[:-2] + [np.prod(x_shape[-2:])]
+            return K.reshape(new_x, new_x_shape)
+
+        def scaled_dot_product_attention(q, k, v):
+            # Attention(Q, K, V) = (softmax(Q*K_T} / sqrt(d_k)) * V
+            w = K.batch_dot(q, k)
+            w = w / K.sqrt(K.cast(shape_list(v)[-1], K.floatx()))
+            # Apply mask
+            if mask is not None:
+                w = K.cast(mask, K.floatx()) * w + (1.0 - K.cast(mask, K.floatx())) * -1e9
+            w = K.softmax(w)
+            return K.batch_dot(w, v)
+
+        # Split Q, V, A representations
+        _q, _k, _v = inputs[:, :, :self.units], inputs[:, :, self.units:2 * self.units], inputs[:, :, -self.units:]
+
+        # Split heads for Q, V, A representations
+        q = split_heads(_q, self.n_heads)  # Queries
+        k = split_heads(_k, self.n_heads, k=True)  # Keys
+        v = split_heads(_v, self.n_heads)  # Values
+
+        ia = scaled_dot_product_attention(q, k, v)
+
+        return merge_heads(ia)
+
+    def get_config(self):
+        config = {
+            'n_heads': self.n_heads,
+            'units': self.units
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+

@@ -1,4 +1,6 @@
+import re
 import spacy
+from spacy.symbols import ORTH, LEMMA, POS, TAG
 
 
 def tokenize_doc(doc):

@@ -1,0 +1,65 @@
+{
+  "task": {
+    "operation_mode": "train",
+    "task_name": "eurovoc_classification",
+    "dataset_type": "json",
+    "dataset": "eurovoc_en",
+    "decision_type": "multi_label",
+    "cuDNN": true,
+    "task_language": "en"
+  },
+  "model": {
+    "architecture": "BERT",
+    "hierarchical": true,
+    "document_encoder": false,
+    "label_encoder": null,
+    "attention_mechanism": "maxpooling",
+    "return_attention":  false,
+    "token_encoding": "word2vec",
+    "embeddings": "en/glove.6B.200d.bin",
+    "bert": "scibert"
+  },
+  "training": {
+    "n_hidden_layers": 1,
+    "hidden_units_size": 100,
+    "dropout_rate": 0.1,
+    "word_dropout_rate": 0.00,
+    "lr": 0.00002,
+    "batch_size": 4,
+    "epochs": 20,
+    "patience": 2
+  },
+  "hyper_optimization": {
+    "grid_search": true,
+    "log_name": "",
+    "score_to_track": "R-Precision",
+    "trials": 10,
+    "folds": 1,
+    "n_hidden_layers": [1],
+    "hidden_units_size": [5],
+    "dropout_rate": [0.1],
+    "word_dropout_rate": [0.00],
+    "learning_rate": [0.00002, 0.00003, 0.00005],
+    "batch_size": [8],
+    "epochs": 20,
+    "patience": 2
+  },
+  "sampling": {
+    "few_threshold": 50,
+    "max_sequences_size": 2,
+    "max_sequence_size": 64,
+    "max_label_size": 6,
+    "sampling_ratio": null,
+    "split_type": null,
+    "validation_size": 0.2,
+    "preprocessed": false,
+    "load_from_disk": false,
+    "dynamic_batching": false
+  },
+  "evaluation": {
+    "evaluation@k": 10,
+    "advanced_mode": true,
+    "save_predictions": false,
+    "model_path": null
+  }
+}
